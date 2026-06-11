@@ -12,12 +12,9 @@ import torch.nn as nn
 
 
 def train(args, data_loader, model):
-    # Label smoothing: 작은 데이터셋(900장)에서 과적합/과신 완화
+
     criterion = torch.nn.CrossEntropyLoss(label_smoothing=0.1)
 
-    # 차등 learning rate:
-    #  - 사전학습 backbone은 낮은 lr로 미세조정 (사전학습 feature 보존)
-    #  - 새로 초기화된 fc는 높은 lr로 빠르게 학습
     backbone_params = [p for name, p in model.named_parameters() if not name.startswith('classifier')]
     head_params = [p for name, p in model.named_parameters() if name.startswith('classifier')]
 
@@ -26,7 +23,6 @@ def train(args, data_loader, model):
         {'params': head_params, 'lr': args.learning_rate * 10},
     ], weight_decay=1e-4)
 
-    # Cosine annealing: 후반부 lr을 줄여 안정적으로 수렴
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs)
 
     history = {'loss': [], 'accuracy': []}
@@ -45,7 +41,7 @@ def train(args, data_loader, model):
 
             output = model(image)
 
-            label = label.view(-1)  # squeeze 대신 view(-1): batch=1일 때도 안전
+            label = label.view(-1)  
             loss = criterion(output, label)
             loss.backward()
             optimizer.step()
@@ -84,32 +80,26 @@ if __name__ == '__main__':
     args.device = device
     num_classes = 10
 
-    # hyperparameters
     args.epochs = 30
-    args.learning_rate = 1e-4   # backbone용 낮은 lr (fc는 내부에서 x10)
+    args.learning_rate = 1e-4
     args.batch_size = 8
     args.num_workers = 2
-
-    # check settings
-    print("==============================")
     print("Save path:", args.save_path)
     print("Data:", args.data)
     print('Using Device:', device)
     print('Number of usable GPUs:', torch.cuda.device_count())
 
-    # Print Hyperparameter
     print("Batch_size:", args.batch_size)
     print("learning_rate:", args.learning_rate)
     print("Epochs:", args.epochs)
     print("==============================")
 
-    # Make Data loader and Model
+    
     train_loader = make_data_loader(args)
 
-    # torchvision model (사전학습 ResNet50 전이학습)
+    
     model = efficientnet_v2_m(weights=EfficientNet_V2_M_Weights.DEFAULT)
 
-    # change num_classes to 10
     num_features = model.classifier[1].in_features
     model.classifier[1] = nn.Linear(num_features, num_classes)
     model.to(device)

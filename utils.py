@@ -15,25 +15,13 @@ try:
 except ImportError:
     HAS_CV2 = False
 
-# Keep train/test split deterministic for comparable accuracy runs.
 torch.manual_seed(1004)
 
-# ImageNet 사전학습 모델용 정규화 상수
 IMAGENET_MEAN = [0.485, 0.456, 0.406]
 IMAGENET_STD = [0.229, 0.224, 0.225]
 
 
 class RandomSketch:
-    """실사 이미지를 '스케치 풍'으로 변환하는 증강 (test 도메인 관찰 기반).
-
-    test 데이터 관찰 결과 스케치 스타일이 4종류로 확인됨:
-      1) edge      : 얇은/굵은 윤곽선 손그림 (흰 배경 + 검은 선)
-      2) pencil    : 연필 음영 스케치
-      3) silhouette: 속이 꽉 찬 검은 실루엣
-      4) inverted  : 검은 배경 + 흰 선 (흑백 반전)
-    1~3 스타일 중 하나를 랜덤 적용 후, 일부 확률로 4(반전)를 추가 적용한다.
-    train 이미지만 변형하므로 'test 이미지 학습 금지' 규정을 준수한다.
-    """
 
     def __init__(self, p=1.0, invert_p=0.25):
         self.p = p
@@ -47,7 +35,6 @@ class RandomSketch:
         style = random.choice(['edge', 'edge', 'pencil', 'silhouette'])
 
         if style == 'edge':
-            # 윤곽선 손그림: Canny 엣지 + dilate (선 두께 랜덤)
             if HAS_CV2:
                 arr = np.asarray(gray)
                 low = random.randint(30, 70)
@@ -56,14 +43,13 @@ class RandomSketch:
                 k = random.choice([1, 2, 2, 3])
                 if k > 1:
                     edges = cv2.dilate(edges, np.ones((k, k), np.uint8))
-                sketch = Image.fromarray(255 - edges)  # 흰 배경 + 검은 선
+                sketch = Image.fromarray(255 - edges)  
             else:
                 edges = gray.filter(ImageFilter.FIND_EDGES)
                 edges = ImageOps.autocontrast(edges)
                 sketch = ImageOps.invert(edges)
 
         elif style == 'pencil':
-            # 연필 스케치(dodge blend)
             inv = ImageOps.invert(gray)
             blur = inv.filter(ImageFilter.GaussianBlur(radius=random.uniform(8, 16)))
             g = np.asarray(gray, dtype=np.float32)
@@ -72,20 +58,19 @@ class RandomSketch:
             dodge = np.clip(dodge, 0, 255).astype(np.uint8)
             sketch = Image.fromarray(dodge)
 
-        else:  # silhouette
-            # 검은 실루엣: Otsu 이진화로 전경을 통째로 검게
+        else:  
             if HAS_CV2:
                 arr = np.asarray(gray)
                 _, binary = cv2.threshold(arr, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-                # 전경(소수 픽셀)이 검정이 되도록 극성 결정
+
                 if (binary == 0).mean() > 0.5:
                     binary = 255 - binary
-                # 노이즈 제거 + 형태 다듬기
+                
                 binary = cv2.morphologyEx(binary, cv2.MORPH_OPEN, np.ones((3, 3), np.uint8))
                 binary = cv2.morphologyEx(binary, cv2.MORPH_CLOSE, np.ones((5, 5), np.uint8))
                 sketch = Image.fromarray(binary)
             else:
-                # cv2 없으면 단순 임계값 이진화
+                
                 arr = np.asarray(gray)
                 t = int(arr.mean())
                 binary = np.where(arr < t, 0, 255).astype(np.uint8)
@@ -93,19 +78,13 @@ class RandomSketch:
                     binary = 255 - binary
                 sketch = Image.fromarray(binary)
 
-        # 흑백 반전 스타일 (검은 배경 + 흰 선/실루엣) 커버
+        
         if random.random() < self.invert_p:
             sketch = ImageOps.invert(sketch.convert('L'))
 
         return sketch.convert('RGB')
 
 
-# ============================================================
-# 학습 전략: 데이터셋 2배 확장 (실사 900장 + 스케치 변환 900장 = 1800장)
-# 해상도 320: fine-grained 구분(castle/church 등) 위해 상향
-# ============================================================
-
-# 실사용 transform (색/질감 증강)
 photo_transform = transforms.Compose([
     transforms.RandomResizedCrop(320, scale=(0.65, 1.0)),
     transforms.RandomHorizontalFlip(),
@@ -117,7 +96,7 @@ photo_transform = transforms.Compose([
     transforms.RandomErasing(p=0.2),
 ])
 
-# 스케치용 transform (항상 스케치 변환, 4가지 스타일)
+
 sketch_always_transform = transforms.Compose([
     transforms.RandomResizedCrop(320, scale=(0.65, 1.0)),
     transforms.RandomHorizontalFlip(),
@@ -127,17 +106,16 @@ sketch_always_transform = transforms.Compose([
     transforms.Normalize(IMAGENET_MEAN, IMAGENET_STD),
 ])
 
-# 하위 호환용 (단일 transform 방식, 현재는 사용 안 함)
+
 train_transform = photo_transform
 
-# 평가/추론용 transform
+
 eval_transform = transforms.Compose([
     transforms.Resize((320, 320)),
     transforms.ToTensor(),
     transforms.Normalize(IMAGENET_MEAN, IMAGENET_STD),
 ])
 
-# 추론 TTA용: grayscale 버전
 eval_gray_transform = transforms.Compose([
     transforms.Resize((320, 320)),
     transforms.Grayscale(num_output_channels=3),
@@ -145,12 +123,10 @@ eval_gray_transform = transforms.Compose([
     transforms.Normalize(IMAGENET_MEAN, IMAGENET_STD),
 ])
 
-# 하위 호환
 custom_transform = eval_transform
 
 
 def make_data_loader(args):
-    # 실사 900장 + 스케치 변환 900장 = 1800장 (실사:스케치 = 1:1)
     photo_ds = datasets.ImageFolder(args.data, transform=photo_transform)
     sketch_ds = datasets.ImageFolder(args.data, transform=sketch_always_transform)
     train_dataset = ConcatDataset([photo_ds, sketch_ds])

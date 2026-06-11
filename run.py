@@ -47,7 +47,6 @@ class ImageDataset(Dataset):
             raise FileNotFoundError(img_path)
         img = Image.open(img_path).convert('RGB')
 
-        # TTA: 같은 이미지의 두 가지 view(원본 정규화 / grayscale 정규화)를 반환
         data = eval_transform(img)
         data_gray = eval_gray_transform(img)
         return data, data_gray, label, img_name
@@ -68,7 +67,6 @@ def inference(args, data_loader, model):
             image = x.to(args.device)
             image_gray = x_gray.to(args.device)
 
-            # 두 view의 softmax 확률을 평균 (후처리: 스케치 이미지에 강건)
             prob = F.softmax(model(image), dim=1) + F.softmax(model(image_gray), dim=1)
 
             _, predicted = torch.max(prob, 1)
@@ -93,7 +91,7 @@ if __name__ == '__main__':
     num_classes = 10
     classes = CLASS_NAMES
 
-    # torchvision model
+  
     model = efficientnet_v2_m(weights=EfficientNet_V2_M_Weights.DEFAULT)
     num_features = model.classifier[1].in_features
     model.classifier[1] = nn.Linear(num_features, num_classes)
@@ -101,7 +99,6 @@ if __name__ == '__main__':
     model.load_state_dict(torch.load(args.load_model, map_location=device))
     model.to(device)
 
-    # load dataset in test image folder
     manifest_path = os.path.join(args.dataset, 'test_manifest.csv')
     test_data = ImageDataset(
         args.dataset,
@@ -110,7 +107,6 @@ if __name__ == '__main__':
     )
     test_loader = torch.utils.data.DataLoader(test_data, batch_size=args.batch_size)
 
-    # write model inference
     filenames, preds, labels = inference(args, test_loader, model)
     save_prediction_csv(args.csv_output, filenames, preds, labels, classes)
     print(f"Detailed results saved to: {args.csv_output}")
