@@ -9,7 +9,6 @@ from torchvision.models import efficientnet_v2_s, EfficientNet_V2_S_Weights
 
 import torch
 import torch.nn as nn
-from torchvision.models import resnet50, ResNet50_Weights
 
 
 def train(args, data_loader, model):
