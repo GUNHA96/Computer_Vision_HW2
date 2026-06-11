@@ -87,7 +87,7 @@ if __name__ == '__main__':
     # hyperparameters
     args.epochs = 50
     args.learning_rate = 1e-4   # backbone용 낮은 lr (fc는 내부에서 x10)
-    args.batch_size = 32
+    args.batch_size = 16
     args.num_workers = 2
 
     # check settings
