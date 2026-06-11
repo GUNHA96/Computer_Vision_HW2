@@ -19,8 +19,9 @@ def train(args, data_loader, model):
     # 차등 learning rate:
     #  - 사전학습 backbone은 낮은 lr로 미세조정 (사전학습 feature 보존)
     #  - 새로 초기화된 fc는 높은 lr로 빠르게 학습
-    backbone_params = [p for name, p in model.named_parameters() if not name.startswith('fc')]
-    head_params = [p for name, p in model.named_parameters() if name.startswith('fc')]
+    backbone_params = [p for name, p in model.named_parameters() if not name.startswith('classifier')]
+    head_params = [p for name, p in model.named_parameters() if name.startswith('classifier')]
+
     optimizer = torch.optim.AdamW([
         {'params': backbone_params, 'lr': args.learning_rate},
         {'params': head_params, 'lr': args.learning_rate * 10},
