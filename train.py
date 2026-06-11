@@ -5,7 +5,7 @@ import time
 import numpy as np
 from tqdm import tqdm
 from utils import acc, make_data_loader, save_training_plot
-from torchvision.models import efficientnet_v2_s, EfficientNet_V2_S_Weights
+from torchvision.models import efficientnet_v2_m, EfficientNet_V2_M_Weights
 
 import torch
 import torch.nn as nn
@@ -85,9 +85,9 @@ if __name__ == '__main__':
     num_classes = 10
 
     # hyperparameters
-    args.epochs = 50
+    args.epochs = 30
     args.learning_rate = 1e-4   # backbone용 낮은 lr (fc는 내부에서 x10)
-    args.batch_size = 16
+    args.batch_size = 8
     args.num_workers = 2
 
     # check settings
@@ -107,7 +107,7 @@ if __name__ == '__main__':
     train_loader = make_data_loader(args)
 
     # torchvision model (사전학습 ResNet50 전이학습)
-    model = efficientnet_v2_s(weights=EfficientNet_V2_S_Weights.DEFAULT)
+    model = efficientnet_v2_m(weights=EfficientNet_V2_M_Weights.DEFAULT)
 
     # change num_classes to 10
     num_features = model.classifier[1].in_features

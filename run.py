@@ -4,7 +4,7 @@ import os
 import torch
 import torch.nn.functional as F
 from torch.utils.data import Dataset
-from torchvision.models import efficientnet_v2_s, EfficientNet_V2_S_Weights
+from torchvision.models import efficientnet_v2_m, EfficientNet_V2_M_Weights
 from model import BaseModel
 from tqdm import tqdm
 from PIL import Image
@@ -94,7 +94,7 @@ if __name__ == '__main__':
     classes = CLASS_NAMES
 
     # torchvision model
-    model = efficientnet_v2_s(weights=EfficientNet_V2_S_Weights.DEFAULT)
+    model = efficientnet_v2_m(weights=EfficientNet_V2_M_Weights.DEFAULT)
     num_features = model.classifier[1].in_features
     model.classifier[1] = nn.Linear(num_features, num_classes)
 
